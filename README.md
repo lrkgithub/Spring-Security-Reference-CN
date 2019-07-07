@@ -22,7 +22,7 @@
       3.3.1 使用 Gradle 部署 Spring Boot
       3.3.2 不使用 Spring Boot 的 Gradle 部署
       3.3.3 Gradle 源
-  4 项目模块
+    4 项目模块
     4.1 Core-spring-security-core.jar
     4.2  Remoting - spring-security-remoting.jar
     4.3 Web - spring-security-web.jar
@@ -67,7 +67,7 @@
       6.6.8 OAuth2AccessTokenResponseClient
     6.7 OAuth 2.0 Login
       6.7.1 Spring Boot 2.x 示例
-  8 架构与实现
+    8 架构与实现
     8.1 技术概述
       8.1.1 运行时环境
       8.1.2 核心组件
@@ -78,7 +78,7 @@
     8.2 核心服务
       8.2.1 The AuthenticationManager, ProviderManager and AuthenticationProvider
       8.2.2 UserDetailsService 实现
-  9 测试
+    9 测试
     9.1 测试方法安全性 
       9.1.1 安全测试设置
       9.1.2 @WithMockUser
@@ -151,6 +151,6 @@
       11.3.1 总览
       11.3.2 Web 安全表达式
       11.3.3 方法安全表达式
-  13 Spring Data 集成
+    13 Spring Data 集成
     13.1 Spring Data & Spring Security 配置
     13.2 使用 @Query 的 Security 表达式
