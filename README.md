@@ -1,18 +1,19 @@
-# Spring-Security-Reference-CN
+Spring-Security-Reference-CN
 
 作者
-章节Ⅰ 前言
-  1. Spring Security 社区
+章节Ⅰ 
+	前言
+  1.Spring Security 社区
     1.1 获得帮助
     1.2 成为参与者
     1.3 源码
     1.4 Apache 2 License
     1.5 社交媒体
-  2. Spring Security 5.1 中的新东西
+  2.Spring Security 5.1 中的新东西
     2.1 Servlet 
     2.2 WebFlux
     2.3 集成
-  3. 获取Spring Security
+  3.获取Spring Security
     3.1 发布版本
     3.2 使用 Maven
       3.2.1 使用 Maven 部署 Spring Boot
@@ -22,7 +23,7 @@
       3.3.1 使用 Gradle 部署 Spring Boot
       3.3.2 不使用 Spring Boot 的 Gradle 部署
       3.3.3 Gradle 源
-    4 项目模块
+   4.项目模块
     4.1 Core-spring-security-core.jar
     4.2  Remoting - spring-security-remoting.jar
     4.3 Web - spring-security-web.jar
@@ -35,7 +36,7 @@
     4.10 CAS - spring-security-cas.jar
     4.11 OpenID - spring-security-openid.jar
     4.12 Test - spring-security-test.jar
-  5. 示例程序
+  5.示例程序
     5.1 教程示例
     5.2 联系人
     5.3 LDAP 示例
@@ -43,8 +44,10 @@
     5.5 CAS 示例
     5.6 JAAS 示例
     5.7 Pre-Authentication 示例
+
 章节Ⅱ Servlet 应用
-  6. Java 配置
+
+  6.Java 配置
     6.1 Hello Web Security Java Configuration
       6.1.1 AbstractSecurityWebApplicationInitializer
       6.1.2 AbstractSecurityWebApplicationIInitializer 不依赖 Spring 容器
@@ -67,7 +70,7 @@
       6.6.8 OAuth2AccessTokenResponseClient
     6.7 OAuth 2.0 Login
       6.7.1 Spring Boot 2.x 示例
-    8 架构与实现
+  8.架构与实现
     8.1 技术概述
       8.1.1 运行时环境
       8.1.2 核心组件
@@ -78,7 +81,7 @@
     8.2 核心服务
       8.2.1 The AuthenticationManager, ProviderManager and AuthenticationProvider
       8.2.2 UserDetailsService 实现
-    9 测试
+  9.测试
     9.1 测试方法安全性 
       9.1.1 安全测试设置
       9.1.2 @WithMockUser
@@ -91,7 +94,7 @@
       9.2.2 SecurityMockMvcRequestPostProcessors
       9.2.3 SecurityMockMvcRequestBuilders
       9.2.4 SecurityMockMvcREsultMatchers 
-  10. Web Application Security
+  10.Web Application Security
     10.1 The Security Filter Chain
       10.1.1 DelegatingFilterProxy
       10.1.2 FilterChainProxy
@@ -138,7 +141,7 @@
       10.11.2 WebSocket 认证
       10.11.3 WebSocket 认证
       10.11.4 强制同源策略
-  11. 认证
+  11.认证
     11.1 认证架构
       11.1.1 Authorities
       11.1.2 预调用处理
@@ -151,6 +154,6 @@
       11.3.1 总览
       11.3.2 Web 安全表达式
       11.3.3 方法安全表达式
-    13 Spring Data 集成
+  13.Spring Data 集成
     13.1 Spring Data & Spring Security 配置
     13.2 使用 @Query 的 Security 表达式
