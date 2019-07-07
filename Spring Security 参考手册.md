@@ -26,7 +26,7 @@ Spring Security 是一个提供认证，授权和保护常用攻击的框架。S
 
 ## 章节Ⅰ 前言
 
-这一部分将会讨论 Spring Security 的 物流。
+这一部分将会讨论 Spring Security 的流程。
 
 
 
@@ -694,7 +694,7 @@ public class SecurityWebApplicationInitializer
 
 
 
-##### 6.1.3 AbstractSecurityWebApplicationInitializer 依赖 Spring 容器
+##### 6.1.3 AbstractSecurityWebApplicationInitializer 与 Spring MVC
 
 如果我们在应用的其他地方使用了 Spring ，那么大概已经有了一个用来加载 Spring Configuration 的 `WebApplicationInitializer` 。如果我们使用之前的配置，会得到一个 error。反之，我们应该将 Spring Security 注册到已有的 `ApplicationContext` 中。举例来说，如果我们使用 Spring MVC 或我们的 `SecurityWebApplicationInitializer` ，看上去会是这样：
 
@@ -1073,6 +1073,298 @@ public class OAuth2ClientController {
 
 
 ##### 6.6.4 OAuth2AuthorizedClientRepository / OAuth2AuthorizedClientService
+
+`OAuth2AuthorizedClientRepository` 的任务是在 Web 请求之间，持久化 `OAuth2AuthorizedClient(s)` 。然而， `OAuth2AuthorizedClientService` 的主要作用是在应用级别管理 `OAuth2AuthorizedClient` 。
+
+从开发者角度， `OAuth@AuthorizedClientRepository` 或 `OAuthorizedClientService` 提供了寻找与客户端关联的 `OAuth2AccessToken` 的功能，以便能够是用来它初始化对受保护资源的请求。
+
+> Spring Boot 2.x 在自动配置中注册了一个 `OAuthorizedClientRepository` 和/或 `OAuthorizedClientService` `@Bean` 在 `ApplicationContext` 。
+
+开发者可能也会注册一个 `OAuthorizedClientRepository` 或 `OAuthAuthorizedClientService` `@Bean` 到 `ApplicationContext` 中（重写 Spring Boot 的自动配置），这样就能够寻找与特定的 `ClientRegistration` （客户端）相关联的 `OAuth2AccessToken` 。
+
+下面是一个示例：
+
+```java
+@Controller
+public class OAuth2LoginController {
+
+    @Autowired
+    private OAuth2AuthorizedClientService authorizedClientService;
+
+    @RequestMapping("/userinfo")
+    public String userinfo(OAuth2AuthenticationToken authentication) {
+        // authentication.getAuthorizedClientRegistrationId() returns the
+        // registrationId of the Client that was authorized during the oauth2Login() flow
+        OAuth2AuthorizedClient authorizedClient =
+            this.authorizedClientService.loadAuthorizedClient(
+                authentication.getAuthorizedClientRegistrationId(),
+                authentication.getName());
+
+        OAuth2AccessToken accessToken = authorizedClient.getAccessToken();
+
+        ...
+
+        return "userinfo";
+    }
+}
+```
+
+
+
+##### 6.6.5 RegisteredOAuth2AuthorizedClient
+
+`@RegisteredOAuth2AuthorizedClient` 注解能够为 `OAuth2AuthorizedClient` 类型的方法参数注入值。跟通过 `OAuth2AuthorizedClientService` 寻找 `OAuth2AuthorizedClient` 相比，这是一个简单的方法。
+
+```java
+@Controller
+public class OAuth2LoginController {
+
+    @RequestMapping("/userinfo")
+    public String userinfo(@RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient authorizedClient) {
+        OAuth2AccessToken accessToken = authorizedClient.getAccessToken();
+
+        ...
+
+        return "userinfo";
+    }
+}
+```
+
+`OAuth2AuthorizedClientArgumentResolver` 管理 `@RegisteredOAuth2AuthorizedClient` ，并且提供一下能力：
+
+* 如果客户端还未获得授权，那么 `OAuth2AccessToken` 将会自动请求授权
+  * 对 `authorized_code` 来说，这将触发启动请求重定向流程
+  * 对 `client_credentials` 来说，`DefaultClientCredentialsTokenResponseClient` 可以从 Token Endpoint 直接获取通行令牌
+
+
+
+##### 6.6.6 AuthorizationRequestRepository
+
+`AuthorizationRequestRepository` 负责从 Authorization Request 到达到 Authorization Response 被接收到，获取 `OAuth2AuthorizedRequest` 的持久化内容（回调）。
+
+>  `OAuth2AuthorizationRequest` 被用来关联和验证授权响应。
+
+`AuthorizationRequestRepository` 的默认实现是 `HttpSessionOAuth2AuthorizationRequestRepository` 。这个实现，是把 `OAuth2AuthorizationRequest` 存储在 `HttpSession` 。
+
+如果你想自己实现一个 `AuthorizationRequestRepository` 来把 `OAuth2AuthorizationRequest` 存储在 `Cookie` 。你可以像下面的代码一样配置：
+
+```java
+@EnableWebSecurity
+public class OAuth2ClientSecurityConfig extends WebSecurityConfigurerAdapter {
+
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http
+            .oauth2Client()
+                .authorizationCodeGrant()
+                    .authorizationRequestRepository(this.cookieAuthorizationRequestRepository())
+                    ...
+    }
+
+    private AuthorizationRequestRepository<OAuth2AuthorizationRequest> cookieAuthorizationRequestRepository() {
+        return new HttpCookieOAuth2AuthorizationRequestRepository();
+    }
+}
+```
+
+
+
+##### 6.6.7 OAuth2AuthorizationRequestResolver
+
+`OAuth2AuthorizationRequestResolver` 的主要作用从受保护的 web 请求中解析 `OAuth2AuthorizationRequest` 。默认实现 `DefaultOAuth2AuthorizationRequestResolver` 会匹配（默认）路径 `/oauth2/authorization/{registrationId}` ，并从中提取出 `registrationId` ，并用它位相关联的 `ClientRegistration` 构建一个 `OAuth2AuthorizationRequest` 。
+
+`OAuth2AuthorizationRequestResolver` 的一个主要使用场景是，利用它来解析 OAuth 2.0 Authorization Framework 中定义的标准参数之外的参数。
+
+举例来说， OpenID Connect 通过扩展 OAuth 2.0 Authorization Framework 定义的标准参数，来为 Authorization Code Flow 定义了一下额外的 OAuth 2.0 请求参数。其中一个扩展的参数是 `orimpt` 。
+
+> 可选的。空格分隔。用大小写敏感的 ASCII 字符串值来区分认证服务器是否提示终端使用者需要重认证或者认证成功。定义的值有： none，login，consent，select_account。
+
+下面的例子展示了如何实现一个 `OAuth2AuthorizationRequestResolver` ，并为 `oauth2Login()`方法的认证请求自定义了一个 `prompt=consect` 的请求参数。
+
+```java
+@EnableWebSecurity
+public class OAuth2LoginSecurityConfig extends WebSecurityConfigurerAdapter {
+
+    @Autowired
+    private ClientRegistrationRepository clientRegistrationRepository;
+
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http
+            .authorizeRequests()
+                .anyRequest().authenticated()
+                .and()
+            .oauth2Login()
+                .authorizationEndpoint()
+                    .authorizationRequestResolver(
+                            new CustomAuthorizationRequestResolver(
+                                    this.clientRegistrationRepository));    
+    }
+}
+
+public class CustomAuthorizationRequestResolver implements OAuth2AuthorizationRequestResolver {
+    private final OAuth2AuthorizationRequestResolver defaultAuthorizationRequestResolver;
+
+    public CustomAuthorizationRequestResolver(
+            ClientRegistrationRepository clientRegistrationRepository) {
+
+        this.defaultAuthorizationRequestResolver =
+                new DefaultOAuth2AuthorizationRequestResolver(
+                        clientRegistrationRepository, "/oauth2/authorization");
+    }
+
+    @Override
+    public OAuth2AuthorizationRequest resolve(HttpServletRequest request) {
+        OAuth2AuthorizationRequest authorizationRequest =
+                this.defaultAuthorizationRequestResolver.resolve(request);  
+
+        return authorizationRequest != null ?   
+                customAuthorizationRequest(authorizationRequest) :
+                null;
+    }
+
+    @Override
+    public OAuth2AuthorizationRequest resolve(
+            HttpServletRequest request, String clientRegistrationId) {
+
+        OAuth2AuthorizationRequest authorizationRequest =
+                this.defaultAuthorizationRequestResolver.resolve(
+                    request, clientRegistrationId);    
+
+        return authorizationRequest != null ?   
+                customAuthorizationRequest(authorizationRequest) :
+                null;
+    }
+
+    private OAuth2AuthorizationRequest customAuthorizationRequest(
+            OAuth2AuthorizationRequest authorizationRequest) {
+
+        Map<String, Object> additionalParameters =
+                new LinkedHashMap<>(authorizationRequest.getAdditionalParameters());
+        additionalParameters.put("prompt", "consent");  
+
+        return OAuth2AuthorizationRequest.from(authorizationRequest)    
+                .additionalParameters(additionalParameters) 
+                .build();
+    }
+}
+```
+
+* 配置自定义 OAuth2AuthorizationRequestResolver
+* 利用 DefaultOAuth2AuthorizationRequestResolver 来解析 OAuth2AuthorizationRequest
+* 如果 OAuthAuthorizationRequest 被解析成功了，返回自定义的版本，否则返回 null
+* 增加一个自定义参数到 OAuth2AuthorizationRequest.additionalParameters
+* 拷贝一个默认的 OAuthAuthorizationRequest ，这会返回一个 OAuthAuthorizationRequest.Builder 以便更多的修改
+* 重写默认的 additionalParameters
+
+> `OAuth2AuthorizationRequest.Builder.build()` 构造了一个 `OAuth2AuthorizationRequest.authorizationRequestUri` ，它代表完整的 Authorization Request URI，包含了使用 `application/x-www-form-urlencoded` 的 query 参数。
+
+前面的示例，展示了增加一个自定义参数到标准参数上的常用场景。然而，如果你希望去除或者修改标准参数，或者你的需求要比这更高级，那么你需要得到构造一个 Authorization Request URI 的全部控制权。那么，此时你就需要重写 `OAuth2AuthorizationRequest.authorizationRequestUri` 参数。
+
+下面的例子，展示了一种与前面不同的 `customAuthorizationRequest()` 方法，覆盖了 `OAuth2AuthorizationRequest.authorizationRequestUri` 属性。
+
+```java
+private OAuth2AuthorizationRequest customAuthorizationRequest(
+        OAuth2AuthorizationRequest authorizationRequest) {
+
+    String customAuthorizationRequestUri = UriComponentsBuilder
+            .fromUriString(authorizationRequest.getAuthorizationRequestUri())
+            .queryParam("prompt", "consent")
+            .build(true)
+            .toUriString();
+
+    return OAuth2AuthorizationRequest.from(authorizationRequest)
+            .authorizationRequestUri(customAuthorizationRequestUri)
+            .build();
+}
+```
+
+
+
+##### 6.6.8 OAuth2AccessTokenResponseClient
+
+`OAuth2AccessTokenResponseClient` 的主要作用是在 认证服务器的 Token Endponit 用认证授权凭证交换访问令牌凭证。
+
+`OAuth2AccessTokenResponseClient` 对 `authorization_code` 的默认实现是 `DefaultAuthorizationCodeTokenResponseClient` ，它使用了 `RestOperations` 在 Token Endpoint 来交换认证码和访问令牌。
+
+`DefaultAuthorizationCodeTokenResponseClient` 是十分灵活的，允许你自定义 Token Request 的预处理和/或 Token Response 的后处理。
+
+如果你需要自定义 Token Request 的预处理，你可以使用 `DefaultAuthorizationCodeTokenResponseClient.setRequestEntityConverter()` 方法，入参为自定义的 `Converter<OAuth2AuthorizationCodeGrantRequest, RequestEntity<?>>` 。默认实现 `OAuth2AuthorizationCodeGrantRequestEntityConverter` 构建了一个 `RequestEntity` 代表了标准的 OAuth 2.0 Access Token Request 。当然，提供一个自定义的 `Converter` 会允许你扩展标准的 Token Request，例如添加一个自定义的参数。
+
+> 自定义的 `Converter` 必须返回一个合法的 `RequestEntity` ，这样才能够被预期的 OAuth 2.0 Provider 理解。
+
+另一方面，如果你需要自定义 Token Response 的后处理，你需要使用 `DefaultAuthorizationCodeTokenResponseClient.setRestOperations()` ，入参为一个自定义配置的 `RestOperations` 。默认的 `RestOperations` 如下配置：
+
+```java
+RestTemplate restTemplate = new RestTemplate(Arrays.asList(
+        new FormHttpMessageConverter(),
+        new OAuth2AccessTokenResponseHttpMessageConverter()));
+
+restTemplate.setErrorHandler(new OAuth2ErrorResponseErrorHandler());
+```
+
+> 在发送 OAuth 2.0 Access Token Request 时候， Spring MVC 的 `FormHtpMessageConverter` 会被用到。
+
+`OAuth2AccessTokenResponseHttpMessageConverter` 是一个处理 OAuth 2.0 Access Token Response 的 `HttpMessageConverter`。你可以使用 `OAuth2AccessTokenResponseHttpMessageConverter.setTokenResponseConverter()` ，入参是一个自定义的 `Converter<Map<String, String>, OAuth2AccessTokenResponse>`，用来转换 OAuth 2.0 Token Response 参数到一个 `OAuth2AccessTokenResponse` 。
+
+`OAuth2ErrorResponseErrorHandler` 是一个 `ResponseErrorHandler` ，专门来处理 OAuth 2.0 Error（400 Bad Request） 。它用 `OAuth2ErrorHttpMessageConverter` 来转换 OAuth 2.0 Error 参数到一个 `OAuth2Error`。
+
+无论你是自定义一个 `DefaultAuthorizationCodeTokenResponseClient` 还是提供你自己实现的 `OAuth2AccessTokenResponseClient` ，你都需要和如下代码一样的配置：
+
+```java
+@EnableWebSecurity
+public class OAuth2ClientSecurityConfig extends WebSecurityConfigurerAdapter {
+
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http
+            .oauth2Client()
+                .authorizationCodeGrant()
+                    .accessTokenResponseClient(this.customAccessTokenResponseClient())
+                    ...
+    }
+
+    private OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest> customAccessTokenResponseClient() {
+        ...
+    }
+}
+```
+
+
+
+#### 6.7 OAuth 2.0 Login
+
+利用 OAuth 2.0 Login 特性，应用可以使用户通过已有的程序来登录，例如 OAuth 2.0 Provider（例如，Github），或者 OpenID Connect 1.0 Provider（例如，Google）。OAuth 2.0 Login 实现了这种实现场景："Login with Google" 或者 "Login with Github" 。
+
+> OAuth 2.0 Login 使用 Authorization Code Grant 来实现，就是定义在 OAuth 2.0 Authorization Framework 和 OpenID Connect Core 1.0.
+
+
+
+##### 6.7.1 Spring Boot 2.x 示例
+
+Spring Boot 2.x 为 OAuth 2.0 Login 带来了完整的自动配置。
+
+这个章节展示了如何配置 OAuth 2.0 Login 示例，使用 Google 作为 Authentication Provider，并且包含了如下的话题：
+
+* 初始化设置
+* 设置重定向 URI
+* 配置 application.yml
+* 启动应用程序
+
+
+
+**初始化设置**
+
+使用 Google's OAuth 2.0 认证系统来登录，你必须设置在 Google API 控制台中设置项目来获取 OAuth 2.0 凭证。
+
+> Google's OAuth 2.0 实现符合 OpenID 1.0 规范，并且是 OpenID 认证的
+
+跟随 OpenID Connect 页面的配置，从 “Setting up OAuth 2.0” 章节开始。
+
+
+
+**设置重定向 URI**
+
 
 
 
