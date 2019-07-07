@@ -1,7 +1,7 @@
-Spring-Security-Reference-CN
+# Spring-Security-Reference-CN
 
 作者
-章节Ⅰ 
+**章节Ⅰ **
 	前言
   1.Spring Security 社区
     1.1 获得帮助
@@ -45,7 +45,7 @@ Spring-Security-Reference-CN
     5.6 JAAS 示例
     5.7 Pre-Authentication 示例
 
-章节Ⅱ Servlet 应用
+**章节Ⅱ Servlet 应用**
 
   6.Java 配置
     6.1 Hello Web Security Java Configuration
